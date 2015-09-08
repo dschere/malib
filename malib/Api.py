@@ -14,6 +14,8 @@ BROADCAST_EVENT = 1
 POOL_CHECK_CONN_INTERVAL = 60
 POOL_CONN_IDLE_TIME = 60
 
+Logger = logging.getLogger('malib')
+
 class _ConnectionPool( threading.Thread ):
     
 
@@ -32,12 +34,12 @@ class _ConnectionPool( threading.Thread ):
         self.msgq.put( (addr,msg) )
         
     def run(self):
-        logging.info("Connection Pool thread started")
+        Logger.info("Connection Pool thread started")
         try:
             self._run()
         except:
-            logging.error( traceback.format_exc() )
-        logging.info("Connection Pool thread closed")
+            Logger.error( traceback.format_exc() )
+        Logger.info("Connection Pool thread closed")
                
                     
 
@@ -49,16 +51,16 @@ class _ConnectionPool( threading.Thread ):
                        
             now = time.time() 
             if now > self.next_conn_check:
-                logging.info("checking open connections") 
+                Logger.info("checking open connections") 
                 self._check_connections( now )          
                 self.next_conn_check = now + POOL_CHECK_CONN_INTERVAL  
 
             try:
                 (addr,msg) = self.msgq.get( timeout=2 )
             except Queue.Empty:
-                logging.info("empty queue") 
+                Logger.info("empty queue") 
                 continue
-            logging.info("msgq.get -> (%s,%s)" % (str(addr),str(msg)))
+            Logger.info("msgq.get -> (%s,%s)" % (str(addr),str(msg)))
 
             # shutdown event  
             if addr == None and msg == None:
@@ -80,7 +82,7 @@ class _ConnectionPool( threading.Thread ):
             try:
                 s.connect( addr )
             except socket.error:
-                logging.warning("Connect failed for peer %s" % str(addr))
+                Logger.warning("Connect failed for peer %s" % str(addr))
                 pub.sendMessage("peer-connect-failed", addr=addr )
                 return 
             s.settimeout(15) 
@@ -90,7 +92,7 @@ class _ConnectionPool( threading.Thread ):
         try:
             slink.send( s, msg )
         except socket.error:
-            logging.warning("send failed for peer %s" % str(addr))
+            Logger.warning("send failed for peer %s" % str(addr))
             pub.sendMessage("peer-send-failed", addr=addr )
 
         self.pool[addr]=(s,time.time(),slink)
@@ -103,7 +105,7 @@ class _ConnectionPool( threading.Thread ):
                      msg = (BROADCAST_EVENT,"ping",(),)                 
                      slink.send( s, msg )
                  except socket.error:
-                     logging.warning("test failed for peer %s" % str(addr))
+                     Logger.warning("test failed for peer %s" % str(addr))
                      pub.sendMessage("peer-send-failed", addr=addr )
                      try: 
                          s.shutdown( socket.SHUT_RDWR )     
@@ -144,7 +146,7 @@ class MalibApiBase:
         if hasattr(logging,severity):
             getattr(logging,severity)(msg)
         else:
-            logging.error("unknown severity: " + msg)  
+            Logger.error("unknown severity: " + msg)  
     
     def localBroadcast(self, event, *args ):
         pub.sendMessage("localBroadcast", event=event, args=args )

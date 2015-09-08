@@ -1,5 +1,4 @@
 import agentController
-import nat.pmp
 import config
 import p2pp
 import SocketServer
@@ -9,6 +8,9 @@ import Api
 import logging
 import traceback
 from pubsub import pub
+
+Logger = logging.getLogger('malib')
+
 
 class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
 
@@ -30,9 +32,9 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
             if not self.api.addressIsAllowed( self._addr ):
                 allowed = False
         if allowed:
-            logging.info("calling sl.setup on %s" % str(self.request.getsockname()))
+            Logger.info("calling sl.setup on %s" % str(self.request.getsockname()))
             self.sl.setup( self.request )
-            logging.info("setup complete")
+            Logger.info("setup complete")
         else:
             self.request.shutdown( socket.SHUT_RDWR ) 
 
@@ -41,7 +43,7 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
         if hasattr(self.api,"codeIsValid"):        
             if not self.api.codeIsValid( code ):
                 valid = False
-                logging.warning("codeIsValid failed") 
+                Logger.warning("codeIsValid failed") 
 
         if valid:
             self.agentCtrl.hostTheAgent( code, briefcase )
@@ -52,7 +54,7 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
         except socket.error:
             return
   
-        logging.debug("handle request %s" % str(args)) 
+        Logger.debug("handle request %s" % str(args)) 
         msgType = args[0]
         
         if msgType == Api.HOST_AGENT:
@@ -62,14 +64,14 @@ class ThreadedTCPRequestHandler(SocketServer.BaseRequestHandler):
             _p1, event, evt_args = args
             self.agentCtrl.multicastEvent( event, *evt_args )
         else:
-            logging.error("Unknown message type %s" % str(msgType)) 
+            Logger.error("Unknown message type %s" % str(msgType)) 
 
     def handle(self):        
         try:
             while self.running:
                 self._handle()
         except:
-            logging.error( traceback.format_exc() )     
+            Logger.error( traceback.format_exc() )     
             
 
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
@@ -115,21 +117,21 @@ class Peer:
         self.agentCtrl.shutdown()
         Api.ConnectionPool.shutdown() 
 
-        logging.info("joining threading waiting for exit")
+        Logger.info("joining threading waiting for exit")
         # close client socket connections
         pub.sendMessage("sys-shutdown")
 
         Api.ConnectionPool.join()
         self.agentCtrl.join()        
         self.server_thread.join()
-        logging.info("done") 
+        Logger.info("done") 
         
 
 def unittest( peer ):
 
     class TestApi( Api.MalibApiBase ):
         def test(self, *args):
-            logging.info( str(args) )
+            Logger.info( str(args) )
         
     import time
 
@@ -170,11 +172,33 @@ Api.log("info","exiting startup test")
     Api.sendBroadcast( addr, "help", 90 )
 
 
+def setup_logger():
+    # create logger with 'spam_application'
+    logger = logging.getLogger('malib')
+    lvl = getattr(logging, config.LogLevel.upper() )  
+    logger.setLevel(lvl)
+
+    # create file handler which logs even debug messages
+    fh = logging.FileHandler( config.LogFile )
+    fh.setLevel(lvl)
+
+    # create console handler with a higher log level
+    ch = logging.StreamHandler()
+    ch.setLevel(lvl)
+
+    # create formatter and add it to the handlers
+    fmt = "%(asctime)s %(filename)s:%(lineno)d [%(levelname)s] %(message)s"  
+    formatter = logging.Formatter(fmt)
+    fh.setFormatter(formatter)
+    ch.setFormatter(formatter)
+
+    # add the handlers to the logger
+    logger.addHandler(fh)
+    logger.addHandler(ch)
 
 
 if __name__ == '__main__':
     import sys
-
 
     if len(sys.argv) > 1:
         def change_config( **args ):
@@ -183,12 +207,8 @@ if __name__ == '__main__':
                 setattr(config,k,v)
         eval("change_config( %s )" % sys.argv[1])
 
-    logging.basicConfig(
-        filename=config.LogFile,
-        level=getattr(logging,config.LogLevel.upper()),
-        format="%(asctime)s %(filename)s:%(lineno)d [%(levelname)s] %(message)s"
-    )
-
+    setup_logger()
+    
     api = Api.MalibApiBase()
     p = Peer( api )
     p.start()

@@ -6,6 +6,8 @@ import select
 import sys
 import logging
 
+Logger = logging.getLogger("malib")
+
 class AgentController( threading.Thread ):
     """ 
        Uses 3 loopback sockets for IPC (this is platform neutral since windows
@@ -63,7 +65,7 @@ class AgentController( threading.Thread ):
             self.msgq_alert.sendto( "x", self.msgq_alert.getsockname() )
         except:
             if self.running:
-                logging.error("unexpected broken pipe for msgq alert") 
+                Logger.error("unexpected broken pipe for msgq alert") 
         
     def _service_multicastEvent(self, eventId, argList ):
         for r in self.evt_conn:
@@ -82,7 +84,7 @@ class AgentController( threading.Thread ):
         "service incoming mobile agent" 
         initialized = False
         agent_comm = {}
-        logging.info("host incoming agent")
+        Logger.info("host incoming agent")
         while not initialized:         
             ready, _p1, _p2 = select.select([self.rpc_s,self.evt_s],[],[],1)
             for r in ready:
@@ -93,7 +95,7 @@ class AgentController( threading.Thread ):
                     agent_comm['evt'], _addr = self.evt_s.accept()                
                     self.connList.append( agent_comm['evt'] )
                     msg = ('init',(code,briefcase))
-                    logging.info("sending agent the init message")
+                    Logger.info("sending agent the init message")
                     sandbox.sendMessage( agent_comm['evt'], msg )
                     initialized = True
 
@@ -137,7 +139,7 @@ class AgentController( threading.Thread ):
 
 
     def run(self):
-        logging.info("agentController starting")   
+        Logger.info("agentController starting")   
         self.rpc_s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)    
         self.rpc_s.bind( ('127.0.0.1',0) )
         self.rpc_s.listen(1)
@@ -165,17 +167,17 @@ class AgentController( threading.Thread ):
                 proc.kill()
             except:
                 pass   
-        logging.info("agentController exiting")   
+        Logger.info("agentController exiting")   
 
 def unittest():
     import logging
     import Api
    
-    logging.basicConfig( filename="/dev/stdout", level=logging.DEBUG )
+    Logger.basicConfig( filename="/dev/stdout", level=Logger.DEBUG )
 
     class TestApi( Api.MalibApiBase ):
         def test(self, *args):
-            logging.info( str(args) )
+            Logger.info( str(args) )
         
     import time
 

@@ -16,6 +16,8 @@ import socket
 import logging
 import traceback
 
+Logger = logging.getLogger("malib")
+
 class SecureLink:
 
     def __init__(self, name=None):
@@ -35,7 +37,7 @@ class SecureLink:
         payload += pad
         e_payload = cipher.encrypt( payload )
  
-        logging.debug("send: %d %d" % (len(e_payload), len(pad)))
+        Logger.debug("send: %d %d" % (len(e_payload), len(pad)))
         packet = struct.pack('>IB', len(e_payload), len(pad) ) + e_payload
         conn.sendall( packet )
 
@@ -50,9 +52,9 @@ class SecureLink:
             return buf
 
         hdr = _get_chunk( struct.calcsize('>IB') )
-        logging.debug("recv: %s" % repr(hdr))
+        Logger.debug("recv: %s" % repr(hdr))
         (size,padsize) = struct.unpack('>IB', hdr)
-        logging.debug("recv: %d %d" % (size, padsize))
+        Logger.debug("recv: %d %d" % (size, padsize))
         e_data = _get_chunk(  size )
         (bf_key,iv) = self.recv_cypher
         cipher = Blowfish.new(bf_key, Blowfish.MODE_CBC, iv)
@@ -94,7 +96,7 @@ class SecureLink:
         receive other cipher and decrypt
         """
 
-        logging.debug("entering setup")
+        Logger.debug("entering setup")
 
         random_generator = Random.new().read
         # temporary key pair just to encyript the blowfish cyphers
@@ -110,21 +112,21 @@ class SecureLink:
 
         # send the our pubkey so the other peer can encrypt its
         # cipher information and send it to us.
-        logging.debug("%s: exporting public key to remote host" % self.name)
+        Logger.debug("%s: exporting public key to remote host" % self.name)
         self._send( conn, public_key.exportKey() ) 
 
         # get the other's pubkey so we can encrypt our cipher
         # info.
         other_pub_key = RSA.importKey( self._recv(conn) )
-        logging.debug("%s: sending cypher bf=%s iv=%s" % (self.name,bf_key,iv))
+        Logger.debug("%s: sending cypher bf=%s iv=%s" % (self.name,bf_key,iv))
         self._send( conn, (other_pub_key.encrypt(bf_key,0),other_pub_key.encrypt(iv,0)) )
         
         (e_other_bf,e_other_iv) = self._recv( conn )
-        logging.debug("%s: receiving cypher information" % self.name)
+        Logger.debug("%s: receiving cypher information" % self.name)
  
         other_bf = private_key.decrypt(e_other_bf)
         other_iv = private_key.decrypt(e_other_iv) 
-        logging.debug("%s: receiving cypher bf=%s iv=%s" % (self.name,other_bf,other_iv))
+        Logger.debug("%s: receiving cypher bf=%s iv=%s" % (self.name,other_bf,other_iv))
         
         self.recv_cypher = (other_bf,other_iv)
 
@@ -133,12 +135,12 @@ class SecureLink:
 
 def unittest():
     import thread, time
-    logging.basicConfig( filename="/dev/stdout", level=logging.DEBUG )
+    Logger.basicConfig( filename="/dev/stdout", level=Logger.DEBUG )
 
-    logging.debug( "unittest" )
+    Logger.debug( "unittest" )
  
     def test_server():
-        logging.debug( "test_server" )
+        Logger.debug( "test_server" )
         
         s = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
         s.bind( ('',2115) )
@@ -147,7 +149,7 @@ def unittest():
         sl = SecureLink()
         
         sl.setup( conn )
-        logging.debug( "server received %s" % sl.recv( conn ) )
+        Logger.debug( "server received %s" % sl.recv( conn ) )
         conn.shutdown( socket.SHUT_RDWR )
 
     thread.start_new_thread( test_server, () )
